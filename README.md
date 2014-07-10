@@ -1,6 +1,6 @@
 # Multi-User Chat Room
 
-- A Java online chat room which allows many users to discuss together
+- **A Java online chat room which allows many users to discuss together**
 
 
 ## Usage
