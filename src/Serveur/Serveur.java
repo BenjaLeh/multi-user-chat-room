@@ -1,4 +1,4 @@
-package Server;
+package Serveur;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,14 +15,17 @@ import java.util.Iterator;
 import java.util.Scanner;
 
 /**
+ * 服务器持续运行,客户可以通过IP地址和端口号连接服务器
+ * 一旦服务器收到某个客户端发来的消息,便将其转发给所有客户
  * Le serveur qui tourne permanent en permettant la connexion de nouveau client
  * Une fois il reçoit un message d'un client, il le renvoie aux tous les clients
  * 
  * @author Yu LIU
  * 
  */
-public class Server {
+public class Serveur {
 	/**
+	 * 存储所有已连接的客户端的sokets的集合
 	 * Une collection pour stocker tous les sockets de client
 	 * qui sont connectés avec le serveur
 	 */
@@ -30,25 +33,32 @@ public class Server {
 	
 
 	/**
+	 * 构造函数:初始化套接口,等待连接
+	 * 一旦有新的客户端连接上,就开启一个新的线程负责接收它发来的消息并转发给所有客户端
 	 * Le constructeur: Créer et initialiser le socket du serveur et attendre la connexion de client
 	 * Une fois un client est connecté, on crée un nouveau thread pour recevoir le message de ce client
 	 * et le renvoie aux tous les autres
 	 */
-	public Server(int port) {
+	public Serveur(int port) {
 		try {
+			// 在指定端口创建套接口
 			// créer le socket du serveur sur le port indiqué
 			@SuppressWarnings("resource")
 			ServerSocket serverSocket = new ServerSocket(port);
 
 			while (true) {
+				// 监听(一旦有新的客户端连接时返回一个套接口专门用于和此客户端通信)
 				// attendre la connexion de client
 				Socket clientSocket = serverSocket.accept();
 
+				// 访问全局变量clientSocketSet时加锁
 				// vérrouiller la variale partagée "clientSocketSet"
 				synchronized (clientSocketSet) {
+					// 将客户端套接口加入集合
 					// ajouter le socket connecté à la collection
 					clientSocketSet.add(clientSocket);
 
+					// 创建并启动一个专门负责此客户端的线程
 					// créer un Thread uniquement pour récuperer le message de ce client et le renvoyer
 					new ServerThread(clientSocket, clientSocketSet).start();
 				}
@@ -59,6 +69,8 @@ public class Server {
 	}
 
 	/**
+	 * 专门负责一个客户端的服务器线程
+	 * 将此客户端发来的消息转发给所有客户端
 	 * Un Thread du coté serveur juste pour servir à un client
 	 * en récuperant le message envoyé de ce client et le renvoyant aux tous les clients
 	 * 
@@ -67,17 +79,22 @@ public class Server {
 	 */
 	class ServerThread extends Thread {
 		/**
+		 * 此线程连接的client
 		 * Le socket du client connecté dans ce Thread
 		 */
 		private Socket clientSocket;
 		private String clientName;
 		/**
+		 * 保存所有客户套接口的集合
 		 * La collection de tous les clients connectés
 		 */
 		private HashSet<Socket> clientSocketSet;
 
 
 		/**
+		 * 构造函数:创建时传入连接客户端的套接口和所有客户端集合
+		 * 均为将地址传入
+		 * 
 		 * @param clientSocket est le client connecté dans ce Thread
 		 * @param clientSocketSet est la collection de tous les clients
 		 */
@@ -87,42 +104,47 @@ public class Server {
 		}
 
 		/**
-		 * Pour démarrer le Thread
+		 * 启动线程
+		 * pour démarrer le Thread
 		 */
 		public void run() {
 			try {
+				// 启动线程时先接收客户名然后发送给所有客户端"此客户加入聊天室"
 				// quand on démarre le Thread, on récupère d'abord le nom du client et informer tous les clients qu'il a rejoint la sallon 
 				BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 				clientName = br.readLine();
 				synchronized (clientSocketSet) {  // vérrouiller la variale partagée "clientSocketSet"
-					sendToAll(clientName+" rejoint la salon de discussion");
+					sendMessage(clientName+" rejoint la salon de discussion");
 				}
 				System.out.println(clientName+" rejoint la salon de discussion");
 				String messageReceived;
 
 				while (true) {
+					// 一直等到套接口有新信息可以接收
 					// attendre jusqu'à ce qu'il y a le nouveau message à recevoir dans le socket
 					while(clientSocket.getInputStream().available()<=0)
 						;
 					
 					messageReceived = br.readLine();
 					
+					// 如果收到"shutdown"时关闭套接口,并将该用户从客户端集合中删除,之后通知所有其他客户"此客户已退出聊天室"
 					// Si le serveur reçoit le String "shutdown", il ferme le socket connecté avec ce client et puis il envoie le message "ce client a quitté la salon" à tous les autres clients
-					if(messageReceived.equals("shutdown")){
+					if(messageReceived.equals("shutdown")){  // 比较内容时用equals()
 						System.out.println(clientName+" quitte la salon de discussion");
 						clientSocket.close();
 						synchronized (clientSocketSet) {
 							if(clientSocketSet.remove(clientSocket)){
-								sendToAll(clientName+" quitte la salon de discussion");
+								sendMessage(clientName+" quitte la salon de discussion");
 								System.out.println(clientName+" a ete supprime dans la collection des clients");
 							}
 						}
 						break;  // sort du thread et termine
 					}
 
+					// 将接收信息发送给所有客户
 					//  renvoyer le message recu vers tous les clients
 					synchronized (clientSocketSet) {
-						sendToAll(messageReceived);
+						sendMessage(messageReceived);
 					}
 				}
 			} catch (IOException e) {
@@ -131,11 +153,13 @@ public class Server {
 		}
 
 		/**
+		 * 将字符串信息发送给所有客户端
 		 * Envoyer un message vers tous les clients
 		 * 
 		 * @param s est le message à envoyer
 		 */
-		private void sendToAll(String s) {
+		private void sendMessage(String s) {
+			// 遍历集合中的所有元素
 			// parcourir chaque socket des clients
 			Iterator<Socket> it = clientSocketSet.iterator();
 			while (it.hasNext()) {
@@ -155,6 +179,7 @@ public class Server {
 	}
 	
 	/**
+	 * 显示本机已启动的IPv4地址
 	 * affiche l'adresse IPv4 du serveur
 	 */
 	public static void printIPv4() {
@@ -203,6 +228,6 @@ public class Server {
 		int port = scanner.nextInt();
 		printIPv4();
 
-		new Server(port);
+		new Serveur(port);
 	}
 }

@@ -30,9 +30,9 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 public class ClientWindow extends JFrame {
-	private static final long serialVersionUID = 1L;
 	/**
-	 * La partie de top panel de l'interface graphique
+	 * 上部面板区域
+	 * La partie du top panel
 	 */
 	private JLabel labelName;
 	private JTextField textName;
@@ -43,24 +43,28 @@ public class ClientWindow extends JFrame {
 	private JButton buttonConnection;
 	private JButton buttonDisconnection;
 	/**
-	 * La partie du centre de l'interface graphique
+	 * 中间文本区域
+	 * La partie du centre
 	 */
 	private JTextArea textArea;
 	private JScrollPane scrollPane;
 	/**
-	 * La partie de bottom panel de l'interface graphique
+	 * 下部面板区域
+	 * La partie du bottom panel
 	 */
 	private JTextField textField;
 	private JButton buttonSend;
 	private Socket socket;
 	private boolean connected;
 	/**
+	 * 一个可以向其中写入数据的Writer
 	 * un objet PrintWriter qui nous permet d'écrire les données dedans
 	 */
 	private PrintWriter pw;
 
 
 	/**
+	 * 构造函数:创建客户端窗口
 	 * Le constructeur: créer la fenêtre du client
 	 */
 	public ClientWindow() {
@@ -68,7 +72,8 @@ public class ClientWindow extends JFrame {
 		this.setSize(600, 400);
 		this.setTitle("ChatRoom");
 		/**
-		 * Initialize the top panel
+		 * 创建上部面板
+		 * Creer le top panel
 		 */
 		JPanel paneltop = new JPanel();
 		paneltop.setLayout(new FlowLayout());
@@ -85,22 +90,23 @@ public class ClientWindow extends JFrame {
 		textPort = new JTextField(4);
 		paneltop.add(textPort);
 		buttonConnection = new JButton("Connect");
-		ConnectActListener connectionAction = new ConnectActListener();
+		Connection connectionAction = new Connection();
 		buttonConnection.addActionListener(connectionAction);
 		paneltop.add(buttonConnection);
 		buttonDisconnection = new JButton("Disconnect");
-		DisconnectActListener disconnectAction = new DisconnectActListener();
+		Disconnection disconnectAction = new Disconnection();
 		buttonDisconnection.addActionListener(disconnectAction);
 		buttonDisconnection.setEnabled(false);
 		paneltop.add(buttonDisconnection);
 
 		/**
-		 * Initialize the center
+		 * 创建中部滚动面板
+		 * Créer le scroll panel au centre
 		 */
 		textArea = new JTextArea();
 		textArea.setLineWrap(true);
 		textArea.setWrapStyleWord(true);
-		// Add a document listener to the text area refresh it when the new message appears
+		scrollPane = new JScrollPane(textArea);
 		textArea.getDocument().addDocumentListener(new DocumentListener() {
 			
 			@Override
@@ -121,17 +127,17 @@ public class ClientWindow extends JFrame {
 				
 			}
 		});
-		scrollPane = new JScrollPane(textArea);
-		
+
 		/**
-		 * Initialize the bottom panel
+		 * 创建下部面板
+		 * Creer le bottom panel
 		 */
 		JPanel panelBottom = new JPanel();
 		panelBottom.setLayout(new FlowLayout());
 		textField = new JTextField(30);
 		panelBottom.add(textField);
 		buttonSend = new JButton("Send");
-		SendActListener sendAction = new SendActListener();
+		SendMessage sendAction = new SendMessage();
 		buttonSend.addActionListener(sendAction);
 		buttonSend.setEnabled(false);
 		panelBottom.add(buttonSend);
@@ -149,6 +155,7 @@ public class ClientWindow extends JFrame {
 		this.add(panelBottom, BorderLayout.SOUTH);
 
 		/**
+		 * 设置关闭窗口时触发的事件
 		 * l'évenement trigger quand on ferme la fenêtre
 		 */
 		this.addWindowListener(new WindowAdapter() {
@@ -175,22 +182,26 @@ public class ClientWindow extends JFrame {
 
 
 	/**
+	 * Client线程:负责接收并显示消息
 	 * Le thread client: qui est chargé de recevoir le message et l'afficher
 	 * 
 	 * @author Yu LIU
 	 * 
 	 */
-	class ClientReceiveThread extends Thread {
+	class ClientReceive extends Thread {
 
 		public void run() {
 			try {
+				// 启动线程时先将用户名发送
 				// envoyer le nom du client quand on lance le Thread
 				pw.println(textName.getText());
 
+				// 用套接口输入流创建一个Reader以读取其中数据
 				// créer un objet Reader en utilisant le InputStream du socket pour récupérer les données dedans
 				BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
 				while (true) {
+					// 一直等到套接口有新信息可以接收
 					// attendre jusqu'à ce qu'il y a le nouveau message à recevoir dans le socket
 					while(!socket.isClosed() && socket.getInputStream().available()<=0)
 						;
@@ -200,6 +211,7 @@ public class ClientWindow extends JFrame {
 						break;
 					}
 					
+					// 打印日期和信息内容
 					// afficher la date et le message
 					Date date = new Date();
 					DateFormat df = DateFormat.getTimeInstance(DateFormat.LONG,Locale.FRANCE);
@@ -213,13 +225,15 @@ public class ClientWindow extends JFrame {
 	}
 
 	/**
+	 * 创建一个动作监听器用来绑定到Send按钮上
+	 * 向服务器端发送消息
 	 * Create a ActionListener to register on the button Send
 	 * Send the message to the server
 	 * 
 	 * @author Yu LIU
 	 * 
 	 */
-	class SendActListener implements ActionListener {
+	class SendMessage implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
@@ -233,13 +247,15 @@ public class ClientWindow extends JFrame {
 	}
 	
 	/**
+	 * 创建一个动作监听器用来绑定到Connect按钮上
+	 * 和指定IP,Port的服务器连接,成功后为其开启一个新线程
 	 * Create a ActionListener to register on the button Connect
-	 * Connect with the indicated IP and Port then open a new Thread for this connection
+	 * Connect with the indicate IP and Port then open a new Thread for this connection
 	 * 
 	 * @author Yu LIU
 	 *
 	 */
-	class ConnectActListener implements ActionListener {
+	class Connection implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
@@ -248,6 +264,7 @@ public class ClientWindow extends JFrame {
 				int port;
 				IP = textIP.getText();
 				port = Integer.parseInt(textPort.getText());
+				// 初始化套接口并连接
 				socket = new Socket(IP,port);
 				if(socket.isConnected()){
 					System.out.println("successfully connected");
@@ -256,7 +273,7 @@ public class ClientWindow extends JFrame {
 					buttonDisconnection.setEnabled(true);
 					buttonSend.setEnabled(true);
 					pw = new PrintWriter(socket.getOutputStream(), true);
-					new ClientReceiveThread().start();
+					new ClientReceive().start();
 				}
 			} catch (UnknownHostException e1) {
 				System.out.println("Please enter the correct IP address");
@@ -270,12 +287,13 @@ public class ClientWindow extends JFrame {
 	}
 	
 	/**
+	 * 动作监听器,用来断开连接
 	 * A ActionListener bind with the button Disconnect
 	 * 
 	 * @author Yu LIU
 	 *
 	 */
-	class DisconnectActListener implements ActionListener {
+	class Disconnection implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
